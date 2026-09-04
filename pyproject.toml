@@ -1,0 +1,7 @@
+[project]
+name = "csv-profiler"
+version = "1.0.0"
+description = "Profile any CSV — types, stats, nulls, uniques. Pure stdlib"
+authors = [{ name = "v01dst" }]
+license = "MIT"
+requires-python = ">=3.10"
