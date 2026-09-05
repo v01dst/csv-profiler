@@ -116,22 +116,26 @@ def profile_column(name: str, values: list[str], top_n: int = 5) -> ColumnProfil
     return profile
 
 
-def profile_csv(path: str, delimiter: str = ",", top_n: int = 5) -> dict:
+def profile_csv(path: str, delimiter: str = ",", top_n: int = 5, columns: list[str] | None = None) -> dict:
     with open(path, newline="", encoding="utf-8-sig") as f:
         reader = csv.reader(f, delimiter=delimiter)
         rows = list(reader)
     if not rows:
         raise ValueError("csv is empty")
     header, data = rows[0], rows[1:]
-    columns: dict[str, list[str]] = {h: [] for h in header}
+    columns_all: dict[str, list[str]] = {h: [] for h in header}
     for row in data:
         for i, h in enumerate(header):
-            columns[h].append(row[i] if i < len(row) else None)
-    profiles = [profile_column(h, vals, top_n) for h, vals in columns.items()]
+            columns_all[h].append(row[i] if i < len(row) else None)
+    selected = columns if columns else list(columns_all.keys())
+    missing = [c for c in selected if c not in columns_all]
+    if missing:
+        raise ValueError(f"unknown column(s): {', '.join(missing)}")
+    profiles = [profile_column(h, columns_all[h], top_n) for h in selected]
     return {
         "file": path,
         "rows": len(data),
-        "columns": len(header),
+        "columns": len(selected) if columns else len(header),
         "profiles": [p.__dict__ for p in profiles],
     }
 
@@ -160,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     delimiter = ","
     top_n = 5
     as_json = False
+    columns: list[str] | None = None
     path: str | None = None
 
     i = 0
@@ -181,6 +186,10 @@ def main(argv: list[str] | None = None) -> int:
             top_n = int(args[i + 1])
             i += 2
             continue
+        if a in ("-c", "--columns") and i + 1 < len(args):
+            columns = [c.strip() for c in args[i + 1].split(",") if c.strip()]
+            i += 2
+            continue
         if a in ("-h", "--help"):
             print("csv-profiler [--json] [--tsv | -d SEP] [--top N] <file.csv>")
             return 0
@@ -191,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
         print("error: no csv file given", file=sys.stderr)
         return 2
     try:
-        result = profile_csv(path, delimiter, top_n)
+        result = profile_csv(path, delimiter, top_n, columns)
     except (OSError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

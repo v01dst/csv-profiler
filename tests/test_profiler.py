@@ -119,3 +119,28 @@ class RenderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class ColumnsFilterTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.path = write_csv(self.tmp, "a,b,c\n1,2,3\n4,5,6\n")
+
+    def test_profile_subset(self):
+        result = profile_csv(self.path, columns=["b", "a"])
+        names = [p["name"] for p in result["profiles"]]
+        self.assertEqual(names, ["b", "a"])
+
+    def test_unknown_column_raises(self):
+        with self.assertRaises(ValueError):
+            profile_csv(self.path, columns=["zzz"])
+
+    def test_cli_flag(self):
+        import io, contextlib
+        from csv_profiler.__main__ import main
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = main([self.path, "--columns", "c"])
+        self.assertEqual(code, 0)
+        self.assertIn("[c]", buf.getvalue())
+        self.assertNotIn("[a]", buf.getvalue())
